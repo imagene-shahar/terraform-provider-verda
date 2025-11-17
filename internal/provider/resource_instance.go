@@ -15,7 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
-	"github.com/verda-cloud/verda-go/pkg/verda"
+	"github.com/verda-cloud/verdacloud-sdk-go/pkg/verda"
 )
 
 var _ resource.Resource = &InstanceResource{}
@@ -30,32 +30,32 @@ type InstanceResource struct {
 }
 
 type InstanceResourceModel struct {
-	ID               types.String `tfsdk:"id"`
-	InstanceType     types.String `tfsdk:"instance_type"`
-	Image            types.String `tfsdk:"image"`
-	Hostname         types.String `tfsdk:"hostname"`
-	Description      types.String `tfsdk:"description"`
-	PricePerHour     types.Float64 `tfsdk:"price_per_hour"`
-	IP               types.String `tfsdk:"ip"`
-	Status           types.String `tfsdk:"status"`
-	CreatedAt        types.String `tfsdk:"created_at"`
-	SSHKeyIDs        types.List   `tfsdk:"ssh_key_ids"`
-	Location         types.String `tfsdk:"location"`
-	IsSpot           types.Bool   `tfsdk:"is_spot"`
-	OSName           types.String `tfsdk:"os_name"`
-	StartupScriptID  types.String `tfsdk:"startup_script_id"`
-	OSVolumeID       types.String `tfsdk:"os_volume_id"`
-	Contract         types.String `tfsdk:"contract"`
-	Pricing          types.String `tfsdk:"pricing"`
-	CPU              types.Object `tfsdk:"cpu"`
-	GPU              types.Object `tfsdk:"gpu"`
-	Memory           types.Object `tfsdk:"memory"`
-	GPUMemory        types.Object `tfsdk:"gpu_memory"`
-	Storage          types.Object `tfsdk:"storage"`
-	JupyterToken     types.String `tfsdk:"jupyter_token"`
-	Volumes          types.List   `tfsdk:"volumes"`
-	ExistingVolumes  types.List   `tfsdk:"existing_volumes"`
-	OSVolume         types.Object `tfsdk:"os_volume"`
+	ID              types.String  `tfsdk:"id"`
+	InstanceType    types.String  `tfsdk:"instance_type"`
+	Image           types.String  `tfsdk:"image"`
+	Hostname        types.String  `tfsdk:"hostname"`
+	Description     types.String  `tfsdk:"description"`
+	PricePerHour    types.Float64 `tfsdk:"price_per_hour"`
+	IP              types.String  `tfsdk:"ip"`
+	Status          types.String  `tfsdk:"status"`
+	CreatedAt       types.String  `tfsdk:"created_at"`
+	SSHKeyIDs       types.List    `tfsdk:"ssh_key_ids"`
+	Location        types.String  `tfsdk:"location"`
+	IsSpot          types.Bool    `tfsdk:"is_spot"`
+	OSName          types.String  `tfsdk:"os_name"`
+	StartupScriptID types.String  `tfsdk:"startup_script_id"`
+	OSVolumeID      types.String  `tfsdk:"os_volume_id"`
+	Contract        types.String  `tfsdk:"contract"`
+	Pricing         types.String  `tfsdk:"pricing"`
+	CPU             types.Object  `tfsdk:"cpu"`
+	GPU             types.Object  `tfsdk:"gpu"`
+	Memory          types.Object  `tfsdk:"memory"`
+	GPUMemory       types.Object  `tfsdk:"gpu_memory"`
+	Storage         types.Object  `tfsdk:"storage"`
+	JupyterToken    types.String  `tfsdk:"jupyter_token"`
+	Volumes         types.List    `tfsdk:"volumes"`
+	ExistingVolumes types.List    `tfsdk:"existing_volumes"`
+	OSVolume        types.Object  `tfsdk:"os_volume"`
 }
 
 type CPUModel struct {
@@ -195,15 +195,19 @@ func (r *InstanceResource) Schema(ctx context.Context, req resource.SchemaReques
 			"contract": schema.StringAttribute{
 				MarkdownDescription: "Contract type for the instance",
 				Optional:            true,
+				Computed:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"pricing": schema.StringAttribute{
 				MarkdownDescription: "Pricing model for the instance",
 				Optional:            true,
+				Computed:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"cpu": schema.SingleNestedAttribute{
@@ -443,12 +447,18 @@ func (r *InstanceResource) Create(ctx context.Context, req resource.CreateReques
 		return
 	}
 
-	r.flattenInstanceToModel(ctx, instance, &data, &resp.Diagnostics)
-
+	// Save the instance ID to state immediately to prevent duplicate creation
+	// even if subsequent operations fail
+	data.ID = types.StringValue(instance.ID)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
+	// Now populate the rest of the instance data
+	r.flattenInstanceToModel(ctx, instance, &data, &resp.Diagnostics)
+
+	// Update state with full instance details (even if there were non-critical errors)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -555,68 +565,107 @@ func (r *InstanceResource) flattenInstanceToModel(ctx context.Context, instance 
 	diagnostics.Append(diags...)
 	data.SSHKeyIDs = sshKeyList
 
-	cpuObj, diags := types.ObjectValue(
-		map[string]attr.Type{
+	// CPU - check if it has meaningful data
+	if instance.CPU.Description != "" {
+		cpuObj, diags := types.ObjectValue(
+			map[string]attr.Type{
+				"description":     types.StringType,
+				"number_of_cores": types.Int64Type,
+			},
+			map[string]attr.Value{
+				"description":     types.StringValue(instance.CPU.Description),
+				"number_of_cores": types.Int64Value(int64(instance.CPU.NumberOfCores)),
+			},
+		)
+		diagnostics.Append(diags...)
+		data.CPU = cpuObj
+	} else {
+		data.CPU = types.ObjectNull(map[string]attr.Type{
 			"description":     types.StringType,
 			"number_of_cores": types.Int64Type,
-		},
-		map[string]attr.Value{
-			"description":     types.StringValue(instance.CPU.Description),
-			"number_of_cores": types.Int64Value(int64(instance.CPU.NumberOfCores)),
-		},
-	)
-	diagnostics.Append(diags...)
-	data.CPU = cpuObj
+		})
+	}
 
-	gpuObj, diags := types.ObjectValue(
-		map[string]attr.Type{
+	// GPU - check if it has meaningful data
+	if instance.GPU.Description != "" {
+		gpuObj, diags := types.ObjectValue(
+			map[string]attr.Type{
+				"description":    types.StringType,
+				"number_of_gpus": types.Int64Type,
+			},
+			map[string]attr.Value{
+				"description":    types.StringValue(instance.GPU.Description),
+				"number_of_gpus": types.Int64Value(int64(instance.GPU.NumberOfGPUs)),
+			},
+		)
+		diagnostics.Append(diags...)
+		data.GPU = gpuObj
+	} else {
+		data.GPU = types.ObjectNull(map[string]attr.Type{
 			"description":    types.StringType,
 			"number_of_gpus": types.Int64Type,
-		},
-		map[string]attr.Value{
-			"description":    types.StringValue(instance.GPU.Description),
-			"number_of_gpus": types.Int64Value(int64(instance.GPU.NumberOfGPUs)),
-		},
-	)
-	diagnostics.Append(diags...)
-	data.GPU = gpuObj
+		})
+	}
 
-	memoryObj, diags := types.ObjectValue(
-		map[string]attr.Type{
+	// Memory - check if it has meaningful data
+	if instance.Memory.Description != "" {
+		memoryObj, diags := types.ObjectValue(
+			map[string]attr.Type{
+				"description":       types.StringType,
+				"size_in_gigabytes": types.Int64Type,
+			},
+			map[string]attr.Value{
+				"description":       types.StringValue(instance.Memory.Description),
+				"size_in_gigabytes": types.Int64Value(int64(instance.Memory.SizeInGigabytes)),
+			},
+		)
+		diagnostics.Append(diags...)
+		data.Memory = memoryObj
+	} else {
+		data.Memory = types.ObjectNull(map[string]attr.Type{
 			"description":       types.StringType,
 			"size_in_gigabytes": types.Int64Type,
-		},
-		map[string]attr.Value{
-			"description":       types.StringValue(instance.Memory.Description),
-			"size_in_gigabytes": types.Int64Value(int64(instance.Memory.SizeInGigabytes)),
-		},
-	)
-	diagnostics.Append(diags...)
-	data.Memory = memoryObj
+		})
+	}
 
-	gpuMemoryObj, diags := types.ObjectValue(
-		map[string]attr.Type{
+	// GPU Memory - check if it has meaningful data
+	if instance.GPUMemory.Description != "" {
+		gpuMemoryObj, diags := types.ObjectValue(
+			map[string]attr.Type{
+				"description":       types.StringType,
+				"size_in_gigabytes": types.Int64Type,
+			},
+			map[string]attr.Value{
+				"description":       types.StringValue(instance.GPUMemory.Description),
+				"size_in_gigabytes": types.Int64Value(int64(instance.GPUMemory.SizeInGigabytes)),
+			},
+		)
+		diagnostics.Append(diags...)
+		data.GPUMemory = gpuMemoryObj
+	} else {
+		data.GPUMemory = types.ObjectNull(map[string]attr.Type{
 			"description":       types.StringType,
 			"size_in_gigabytes": types.Int64Type,
-		},
-		map[string]attr.Value{
-			"description":       types.StringValue(instance.GPUMemory.Description),
-			"size_in_gigabytes": types.Int64Value(int64(instance.GPUMemory.SizeInGigabytes)),
-		},
-	)
-	diagnostics.Append(diags...)
-	data.GPUMemory = gpuMemoryObj
+		})
+	}
 
-	storageObj, diags := types.ObjectValue(
-		map[string]attr.Type{
+	// Storage - check if it has meaningful data
+	if instance.Storage.Description != "" {
+		storageObj, diags := types.ObjectValue(
+			map[string]attr.Type{
+				"description": types.StringType,
+			},
+			map[string]attr.Value{
+				"description": types.StringValue(instance.Storage.Description),
+			},
+		)
+		diagnostics.Append(diags...)
+		data.Storage = storageObj
+	} else {
+		data.Storage = types.ObjectNull(map[string]attr.Type{
 			"description": types.StringType,
-		},
-		map[string]attr.Value{
-			"description": types.StringValue(instance.Storage.Description),
-		},
-	)
-	diagnostics.Append(diags...)
-	data.Storage = storageObj
+		})
+	}
 }
 
 // Custom plan modifier for bool default value

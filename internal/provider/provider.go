@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/verda-cloud/verda-go/pkg/verda"
+	"github.com/verda-cloud/verdacloud-sdk-go/pkg/verda"
 )
 
 var _ provider.Provider = &VerdaProvider{}
