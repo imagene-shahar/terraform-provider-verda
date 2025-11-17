@@ -7,6 +7,7 @@
 *.dll
 *.so
 *.dylib
+terraform-provider-verda
 
 # Test binary, built with `go test -c`
 *.test
@@ -28,5 +29,27 @@ go.work.sum
 .env
 
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Terraform files
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+crash.log
+crash.*.log
+.terraform/
+.terraform.lock.hcl
+terraform.rc
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# OS
+.DS_Store
+Thumbs.db
