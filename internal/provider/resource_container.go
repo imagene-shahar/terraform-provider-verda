@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -654,15 +656,57 @@ func (r *ContainerResource) Delete(ctx context.Context, req resource.DeleteReque
 		return
 	}
 
-	err := r.client.ContainerDeployments.DeleteDeployment(ctx, data.Name.ValueString(), 300000)
-	if err != nil {
+	// Initiate deletion (ignore timeout errors as we'll poll instead)
+	err := r.client.ContainerDeployments.DeleteDeployment(ctx, data.Name.ValueString(), 60000)
+	if err != nil && !isTimeoutError(err) {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete container deployment, got error: %s", err))
+		return
+	}
+
+	// Poll until deployment is gone (404) with 5 minute timeout
+	if err := r.waitForDeletionComplete(ctx, data.Name.ValueString(), 300); err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Timeout waiting for container deployment deletion: %s", err))
 		return
 	}
 }
 
 func (r *ContainerResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("name"), req, resp)
+}
+
+func isTimeoutError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := err.Error()
+	return strings.Contains(errStr, "504") || strings.Contains(strings.ToLower(errStr), "timeout")
+}
+
+func (r *ContainerResource) waitForDeletionComplete(ctx context.Context, deploymentName string, timeoutSeconds int) error {
+	deadline := time.Now().Add(time.Duration(timeoutSeconds) * time.Second)
+
+	for time.Now().Before(deadline) {
+		// Check if context was cancelled
+		if ctx.Err() != nil {
+			return fmt.Errorf("context cancelled: %w", ctx.Err())
+		}
+
+		// Try to get the deployment
+		_, err := r.client.ContainerDeployments.GetDeploymentByName(ctx, deploymentName)
+		if err != nil {
+			// Check if it's a 404 error (deployment not found = successfully deleted)
+			errStr := err.Error()
+			if strings.Contains(errStr, "404") || strings.Contains(strings.ToLower(errStr), "not found") {
+				return nil
+			}
+			// For other errors, continue polling (deployment might be in transition)
+		}
+
+		// Wait 10 seconds before trying again
+		time.Sleep(10 * time.Second)
+	}
+
+	return fmt.Errorf("timeout after %d seconds waiting for deployment deletion", timeoutSeconds)
 }
 
 func (r *ContainerResource) flattenDeploymentToModel(ctx context.Context, deployment *verda.ContainerDeployment, data *ContainerResourceModel, diagnostics *diag.Diagnostics) {
