@@ -17,20 +17,19 @@ import (
 	"github.com/verda-cloud/verdacloud-sdk-go/pkg/verda"
 )
 
-var _ resource.Resource = &ContainerResource{}
-var _ resource.ResourceWithImportState = &ContainerResource{}
+var _ resource.Resource = &ServerlessJobResource{}
+var _ resource.ResourceWithImportState = &ServerlessJobResource{}
 
-func NewContainerResource() resource.Resource {
-	return &ContainerResource{}
+func NewServerlessJobResource() resource.Resource {
+	return &ServerlessJobResource{}
 }
 
-type ContainerResource struct {
+type ServerlessJobResource struct {
 	client *verda.Client
 }
 
-type ContainerResourceModel struct {
+type ServerlessJobResourceModel struct {
 	Name                      types.String `tfsdk:"name"`
-	IsSpot                    types.Bool   `tfsdk:"is_spot"`
 	Compute                   types.Object `tfsdk:"compute"`
 	Scaling                   types.Object `tfsdk:"scaling"`
 	ContainerRegistrySettings types.Object `tfsdk:"container_registry_settings"`
@@ -39,93 +38,30 @@ type ContainerResourceModel struct {
 	CreatedAt                 types.String `tfsdk:"created_at"`
 }
 
-type ComputeModel struct {
-	Name types.String `tfsdk:"name"`
-	Size types.Int64  `tfsdk:"size"`
+type JobScalingModel struct {
+	MaxReplicaCount        types.Int64 `tfsdk:"max_replica_count"`
+	QueueMessageTTLSeconds types.Int64 `tfsdk:"queue_message_ttl_seconds"`
+	DeadlineSeconds        types.Int64 `tfsdk:"deadline_seconds"`
 }
 
-type ScalingModel struct {
-	MinReplicaCount              types.Int64  `tfsdk:"min_replica_count"`
-	MaxReplicaCount              types.Int64  `tfsdk:"max_replica_count"`
-	QueueMessageTTLSeconds       types.Int64  `tfsdk:"queue_message_ttl_seconds"`
-	DeadlineSeconds              types.Int64  `tfsdk:"deadline_seconds"`
-	ConcurrentRequestsPerReplica types.Int64  `tfsdk:"concurrent_requests_per_replica"`
-	ScaleDownPolicy              types.Object `tfsdk:"scale_down_policy"`
-	ScaleUpPolicy                types.Object `tfsdk:"scale_up_policy"`
-	QueueLoad                    types.Object `tfsdk:"queue_load"`
+func (r *ServerlessJobResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_serverless_job"
 }
 
-type ScalingPolicyModel struct {
-	DelaySeconds types.Int64 `tfsdk:"delay_seconds"`
-}
-
-type QueueLoadTriggerModel struct {
-	Threshold types.Float64 `tfsdk:"threshold"`
-}
-
-type RegistrySettingsModel struct {
-	IsPrivate   types.String `tfsdk:"is_private"`
-	Credentials types.String `tfsdk:"credentials"`
-}
-
-type ContainerModel struct {
-	Image               types.String `tfsdk:"image"`
-	ExposedPort         types.Int64  `tfsdk:"exposed_port"`
-	Healthcheck         types.Object `tfsdk:"healthcheck"`
-	EntrypointOverrides types.Object `tfsdk:"entrypoint_overrides"`
-	Env                 types.List   `tfsdk:"env"`
-	VolumeMounts        types.List   `tfsdk:"volume_mounts"`
-}
-
-type HealthcheckModel struct {
-	Enabled types.String `tfsdk:"enabled"`
-	Port    types.String `tfsdk:"port"`
-	Path    types.String `tfsdk:"path"`
-}
-
-type EnvVarModel struct {
-	Type                     types.String `tfsdk:"type"`
-	Name                     types.String `tfsdk:"name"`
-	ValueOrReferenceToSecret types.String `tfsdk:"value_or_reference_to_secret"`
-}
-
-type EntrypointOverridesModel struct {
-	Enabled    types.Bool `tfsdk:"enabled"`
-	Entrypoint types.List `tfsdk:"entrypoint"`
-	Cmd        types.List `tfsdk:"cmd"`
-}
-
-type VolumeMountModel struct {
-	Type       types.String `tfsdk:"type"`
-	MountPath  types.String `tfsdk:"mount_path"`
-	SecretName types.String `tfsdk:"secret_name"`
-	SizeInMB   types.Int64  `tfsdk:"size_in_mb"`
-	VolumeID   types.String `tfsdk:"volume_id"`
-}
-
-func (r *ContainerResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_container"
-}
-
-func (r *ContainerResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *ServerlessJobResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Manages a Verda container deployment for serverless workloads",
+		MarkdownDescription: "Manages a Verda serverless job deployment",
 
 		Attributes: map[string]schema.Attribute{
 			"name": schema.StringAttribute{
-				MarkdownDescription: "Name of the container deployment",
+				MarkdownDescription: "Name of the serverless job deployment",
 				Required:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"is_spot": schema.BoolAttribute{
-				MarkdownDescription: "Whether to use spot instances (defaults to false)",
-				Optional:            true,
-				Computed:            true,
-			},
 			"compute": schema.SingleNestedAttribute{
-				MarkdownDescription: "Compute resources for the deployment",
+				MarkdownDescription: "Compute resources for the job deployment",
 				Required:            true,
 				Attributes: map[string]schema.Attribute{
 					"name": schema.StringAttribute{
@@ -139,13 +75,9 @@ func (r *ContainerResource) Schema(ctx context.Context, req resource.SchemaReque
 				},
 			},
 			"scaling": schema.SingleNestedAttribute{
-				MarkdownDescription: "Scaling configuration for the deployment",
+				MarkdownDescription: "Scaling configuration for the job deployment",
 				Required:            true,
 				Attributes: map[string]schema.Attribute{
-					"min_replica_count": schema.Int64Attribute{
-						MarkdownDescription: "Minimum number of replicas",
-						Required:            true,
-					},
 					"max_replica_count": schema.Int64Attribute{
 						MarkdownDescription: "Maximum number of replicas",
 						Required:            true,
@@ -157,40 +89,6 @@ func (r *ContainerResource) Schema(ctx context.Context, req resource.SchemaReque
 					"deadline_seconds": schema.Int64Attribute{
 						MarkdownDescription: "Request deadline in seconds",
 						Optional:            true,
-					},
-					"concurrent_requests_per_replica": schema.Int64Attribute{
-						MarkdownDescription: "Maximum concurrent requests per replica",
-						Required:            true,
-					},
-					"scale_down_policy": schema.SingleNestedAttribute{
-						MarkdownDescription: "Scale down policy configuration",
-						Required:            true,
-						Attributes: map[string]schema.Attribute{
-							"delay_seconds": schema.Int64Attribute{
-								MarkdownDescription: "Delay in seconds before scaling down",
-								Required:            true,
-							},
-						},
-					},
-					"scale_up_policy": schema.SingleNestedAttribute{
-						MarkdownDescription: "Scale up policy configuration",
-						Required:            true,
-						Attributes: map[string]schema.Attribute{
-							"delay_seconds": schema.Int64Attribute{
-								MarkdownDescription: "Delay in seconds before scaling up",
-								Required:            true,
-							},
-						},
-					},
-					"queue_load": schema.SingleNestedAttribute{
-						MarkdownDescription: "Queue load trigger configuration",
-						Required:            true,
-						Attributes: map[string]schema.Attribute{
-							"threshold": schema.Float64Attribute{
-								MarkdownDescription: "Queue load threshold for scaling",
-								Required:            true,
-							},
-						},
 					},
 				},
 			},
@@ -212,7 +110,7 @@ func (r *ContainerResource) Schema(ctx context.Context, req resource.SchemaReque
 				},
 			},
 			"containers": schema.ListNestedAttribute{
-				MarkdownDescription: "List of containers in the deployment",
+				MarkdownDescription: "List of containers in the job deployment",
 				Required:            true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
@@ -317,18 +215,18 @@ func (r *ContainerResource) Schema(ctx context.Context, req resource.SchemaReque
 				},
 			},
 			"endpoint_base_url": schema.StringAttribute{
-				MarkdownDescription: "Base URL for the deployment endpoint",
+				MarkdownDescription: "Base URL for the job deployment endpoint",
 				Computed:            true,
 			},
 			"created_at": schema.StringAttribute{
-				MarkdownDescription: "Timestamp when the deployment was created",
+				MarkdownDescription: "Timestamp when the job deployment was created",
 				Computed:            true,
 			},
 		},
 	}
 }
 
-func (r *ContainerResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *ServerlessJobResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -347,8 +245,8 @@ func (r *ContainerResource) Configure(ctx context.Context, req resource.Configur
 	r.client = client
 }
 
-func (r *ContainerResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var data ContainerResourceModel
+func (r *ServerlessJobResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var data ServerlessJobResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 
@@ -356,9 +254,8 @@ func (r *ContainerResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	createReq := &verda.CreateDeploymentRequest{
-		Name:   data.Name.ValueString(),
-		IsSpot: data.IsSpot.ValueBool(),
+	createReq := &verda.CreateJobDeploymentRequest{
+		Name: data.Name.ValueString(),
 	}
 
 	// Parse compute
@@ -368,58 +265,24 @@ func (r *ContainerResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	createReq.Compute = verda.ContainerCompute{
+	createReq.Compute = &verda.ContainerCompute{
 		Name: compute.Name.ValueString(),
 		Size: int(compute.Size.ValueInt64()),
 	}
 
-	// Parse scaling
-	var scaling ScalingModel
+	var scaling JobScalingModel
 	resp.Diagnostics.Append(data.Scaling.As(ctx, &scaling, basetypes.ObjectAsOptions{})...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	scalingOptions := verda.ContainerScalingOptions{
-		MinReplicaCount:              int(scaling.MinReplicaCount.ValueInt64()),
-		MaxReplicaCount:              int(scaling.MaxReplicaCount.ValueInt64()),
-		QueueMessageTTLSeconds:       int(scaling.QueueMessageTTLSeconds.ValueInt64()),
-		ConcurrentRequestsPerReplica: int(scaling.ConcurrentRequestsPerReplica.ValueInt64()),
+	scalingOptions := verda.JobScalingOptions{
+		MaxReplicaCount:        int(scaling.MaxReplicaCount.ValueInt64()),
+		QueueMessageTTLSeconds: int(scaling.QueueMessageTTLSeconds.ValueInt64()),
+		DeadlineSeconds:        int(scaling.DeadlineSeconds.ValueInt64()),
 	}
 
-	// Parse scale down policy
-	var scaleDownPolicy ScalingPolicyModel
-	resp.Diagnostics.Append(scaling.ScaleDownPolicy.As(ctx, &scaleDownPolicy, basetypes.ObjectAsOptions{})...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	scalingOptions.ScaleDownPolicy = &verda.ScalingPolicy{
-		DelaySeconds: int(scaleDownPolicy.DelaySeconds.ValueInt64()),
-	}
-
-	// Parse scale up policy
-	var scaleUpPolicy ScalingPolicyModel
-	resp.Diagnostics.Append(scaling.ScaleUpPolicy.As(ctx, &scaleUpPolicy, basetypes.ObjectAsOptions{})...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	scalingOptions.ScaleUpPolicy = &verda.ScalingPolicy{
-		DelaySeconds: int(scaleUpPolicy.DelaySeconds.ValueInt64()),
-	}
-
-	// Parse queue load trigger
-	var queueLoad QueueLoadTriggerModel
-	resp.Diagnostics.Append(scaling.QueueLoad.As(ctx, &queueLoad, basetypes.ObjectAsOptions{})...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	scalingOptions.ScalingTriggers = &verda.ScalingTriggers{
-		QueueLoad: &verda.QueueLoadTrigger{
-			Threshold: queueLoad.Threshold.ValueFloat64(),
-		},
-	}
-
-	createReq.Scaling = scalingOptions
+	createReq.Scaling = &scalingOptions
 
 	// Parse container registry settings if provided
 	if !data.ContainerRegistrySettings.IsNull() && !data.ContainerRegistrySettings.IsUnknown() {
@@ -430,7 +293,7 @@ func (r *ContainerResource) Create(ctx context.Context, req resource.CreateReque
 		}
 
 		isPrivate := registrySettings.IsPrivate.ValueString() == "true"
-		createReq.ContainerRegistrySettings = verda.ContainerRegistrySettings{
+		createReq.ContainerRegistrySettings = &verda.ContainerRegistrySettings{
 			IsPrivate: isPrivate,
 		}
 
@@ -440,8 +303,7 @@ func (r *ContainerResource) Create(ctx context.Context, req resource.CreateReque
 			}
 		}
 	} else {
-		// By default, we'll assume the registry is public
-		createReq.ContainerRegistrySettings = verda.ContainerRegistrySettings{
+		createReq.ContainerRegistrySettings = &verda.ContainerRegistrySettings{
 			IsPrivate: false,
 		}
 	}
@@ -577,23 +439,22 @@ func (r *ContainerResource) Create(ctx context.Context, req resource.CreateReque
 
 	createReq.Containers = deploymentContainers
 
-	deployment, err := r.client.ContainerDeployments.CreateDeployment(ctx, createReq)
+	deployment, err := r.client.ServerlessJobs.CreateJobDeployment(ctx, createReq)
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create container deployment, got error: %s", err))
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create serverless job deployment, got error: %s", err))
 		return
 	}
 
 	// Flatten API response, merging with plan to preserve fields the API doesn't return
 	planContainers := data.Containers
-	r.flattenDeploymentToModel(ctx, deployment, &data, &resp.Diagnostics)
-	// Merge API response with plan to preserve fields the API doesn't echo back
-	r.mergeContainersFromPlan(ctx, planContainers, &data, &resp.Diagnostics)
+	r.flattenJobDeploymentToModel(ctx, deployment, &data, &resp.Diagnostics)
+	r.mergeJobContainersFromPlan(ctx, planContainers, &data, &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *ContainerResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var data ContainerResourceModel
+func (r *ServerlessJobResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var data ServerlessJobResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
@@ -601,26 +462,24 @@ func (r *ContainerResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	deployment, err := r.client.ContainerDeployments.GetDeploymentByName(ctx, data.Name.ValueString())
+	deployment, err := r.client.ServerlessJobs.GetJobDeploymentByName(ctx, data.Name.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read container deployment, got error: %s", err))
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read serverless job deployment, got error: %s", err))
 		return
 	}
 
 	// Also fetch scaling configuration
-	scalingConfig, err := r.client.ContainerDeployments.GetDeploymentScaling(ctx, data.Name.ValueString())
+	scalingConfig, err := r.client.ServerlessJobs.GetJobDeploymentScaling(ctx, data.Name.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read scaling configuration, got error: %s", err))
 		return
 	}
 
 	// Preserve container configuration from prior state
-	// The API doesn't return all fields (like volume_id for non-shared volumes)
 	priorContainers := data.Containers
-	r.flattenDeploymentToModel(ctx, deployment, &data, &resp.Diagnostics)
-	r.flattenScalingToModel(ctx, scalingConfig, &data, &resp.Diagnostics)
-	// Merge API response with prior state to preserve fields the API doesn't return
-	r.mergeContainersFromPlan(ctx, priorContainers, &data, &resp.Diagnostics)
+	r.flattenJobDeploymentToModel(ctx, deployment, &data, &resp.Diagnostics)
+	r.flattenJobScalingToModel(ctx, scalingConfig, &data, &resp.Diagnostics)
+	r.mergeJobContainersFromPlan(ctx, priorContainers, &data, &resp.Diagnostics)
 
 	if resp.Diagnostics.HasError() {
 		return
@@ -629,8 +488,8 @@ func (r *ContainerResource) Read(ctx context.Context, req resource.ReadRequest, 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *ContainerResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data ContainerResourceModel
+func (r *ServerlessJobResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var data ServerlessJobResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 
@@ -638,15 +497,14 @@ func (r *ContainerResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	// Container deployments cannot be updated, only deleted and recreated
 	resp.Diagnostics.AddError(
 		"Update Not Supported",
-		"Container deployments cannot be updated. Please delete and recreate the resource with new values.",
+		"Serverless job deployments cannot be updated. Please delete and recreate the resource with new values.",
 	)
 }
 
-func (r *ContainerResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data ContainerResourceModel
+func (r *ServerlessJobResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var data ServerlessJobResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
@@ -654,22 +512,21 @@ func (r *ContainerResource) Delete(ctx context.Context, req resource.DeleteReque
 		return
 	}
 
-	err := r.client.ContainerDeployments.DeleteDeployment(ctx, data.Name.ValueString(), 300000)
+	err := r.client.ServerlessJobs.DeleteJobDeployment(ctx, data.Name.ValueString(), 300000)
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete container deployment, got error: %s", err))
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete serverless job deployment, got error: %s", err))
 		return
 	}
 }
 
-func (r *ContainerResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *ServerlessJobResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("name"), req, resp)
 }
 
-func (r *ContainerResource) flattenDeploymentToModel(ctx context.Context, deployment *verda.ContainerDeployment, data *ContainerResourceModel, diagnostics *diag.Diagnostics) {
+func (r *ServerlessJobResource) flattenJobDeploymentToModel(ctx context.Context, deployment *verda.JobDeployment, data *ServerlessJobResourceModel, diagnostics *diag.Diagnostics) {
 	data.Name = types.StringValue(deployment.Name)
-	data.IsSpot = types.BoolValue(deployment.IsSpot)
 	data.EndpointBaseURL = types.StringValue(deployment.EndpointBaseURL)
-	data.CreatedAt = types.StringValue(deployment.CreatedAt.Format("2006-01-02T15:04:05Z"))
+	data.CreatedAt = types.StringValue(deployment.CreatedAt)
 
 	// Flatten compute
 	if deployment.Compute != nil {
@@ -709,163 +566,11 @@ func (r *ContainerResource) flattenDeploymentToModel(ctx context.Context, deploy
 		data.ContainerRegistrySettings = registryObj
 	}
 
-	// Flatten containers - only include user-specified data, filter out API-added mounts
-	r.flattenContainersToModel(ctx, deployment.Containers, data, diagnostics)
+	// Flatten containers
+	r.flattenJobContainersToModel(ctx, deployment.Containers, data, diagnostics)
 }
 
-// mergeContainersFromPlan merges plan/state container data with API response
-// This preserves fields that the API doesn't return (like volume_id for non-shared volumes)
-func (r *ContainerResource) mergeContainersFromPlan(ctx context.Context, planContainers types.List, data *ContainerResourceModel, diagnostics *diag.Diagnostics) {
-	if planContainers.IsNull() || planContainers.IsUnknown() {
-		return
-	}
-
-	var planContainersList []ContainerModel
-	diags := planContainers.ElementsAs(ctx, &planContainersList, false)
-	diagnostics.Append(diags...)
-	if diagnostics.HasError() {
-		return
-	}
-
-	var apiContainersList []ContainerModel
-	if !data.Containers.IsNull() && !data.Containers.IsUnknown() {
-		diags = data.Containers.ElementsAs(ctx, &apiContainersList, false)
-		diagnostics.Append(diags...)
-		if diagnostics.HasError() {
-			return
-		}
-	}
-
-	// If API didn't return containers or returned fewer containers, use plan as-is
-	if len(apiContainersList) == 0 || len(apiContainersList) != len(planContainersList) {
-		data.Containers = planContainers
-		return
-	}
-
-	// Merge each container: use API data where available, fill in from plan where not
-	var mergedContainers []attr.Value
-	for i := range planContainersList {
-		if i >= len(apiContainersList) {
-			break
-		}
-
-		planContainer := planContainersList[i]
-		apiContainer := apiContainersList[i]
-
-		// For volume_mounts, merge carefully
-		// Use plan volume_mounts since API doesn't return all fields (like volume_id for non-shared)
-		mergedContainer := apiContainer
-		mergedContainer.VolumeMounts = planContainer.VolumeMounts
-
-		// Also preserve entrypoint_overrides from plan if API didn't return it
-		if (apiContainer.EntrypointOverrides.IsNull() || apiContainer.EntrypointOverrides.IsUnknown()) &&
-			!planContainer.EntrypointOverrides.IsNull() {
-			mergedContainer.EntrypointOverrides = planContainer.EntrypointOverrides
-		}
-
-		// Convert back to attr.Value
-		containerAttrTypes := map[string]attr.Type{
-			"image":        types.StringType,
-			"exposed_port": types.Int64Type,
-			"healthcheck": types.ObjectType{
-				AttrTypes: map[string]attr.Type{
-					"enabled": types.StringType,
-					"port":    types.StringType,
-					"path":    types.StringType,
-				},
-			},
-			"entrypoint_overrides": types.ObjectType{
-				AttrTypes: map[string]attr.Type{
-					"enabled":    types.BoolType,
-					"entrypoint": types.ListType{ElemType: types.StringType},
-					"cmd":        types.ListType{ElemType: types.StringType},
-				},
-			},
-			"env": types.ListType{
-				ElemType: types.ObjectType{
-					AttrTypes: map[string]attr.Type{
-						"type":                         types.StringType,
-						"name":                         types.StringType,
-						"value_or_reference_to_secret": types.StringType,
-					},
-				},
-			},
-			"volume_mounts": types.ListType{
-				ElemType: types.ObjectType{
-					AttrTypes: map[string]attr.Type{
-						"type":        types.StringType,
-						"mount_path":  types.StringType,
-						"secret_name": types.StringType,
-						"size_in_mb":  types.Int64Type,
-						"volume_id":   types.StringType,
-					},
-				},
-			},
-		}
-
-		containerAttrValues := map[string]attr.Value{
-			"image":                mergedContainer.Image,
-			"exposed_port":         mergedContainer.ExposedPort,
-			"healthcheck":          mergedContainer.Healthcheck,
-			"entrypoint_overrides": mergedContainer.EntrypointOverrides,
-			"env":                  mergedContainer.Env,
-			"volume_mounts":        mergedContainer.VolumeMounts,
-		}
-
-		containerObj, diags := types.ObjectValue(containerAttrTypes, containerAttrValues)
-		diagnostics.Append(diags...)
-		mergedContainers = append(mergedContainers, containerObj)
-	}
-
-	// Create the merged containers list
-	containersList, diags := types.ListValue(
-		types.ObjectType{
-			AttrTypes: map[string]attr.Type{
-				"image":        types.StringType,
-				"exposed_port": types.Int64Type,
-				"healthcheck": types.ObjectType{
-					AttrTypes: map[string]attr.Type{
-						"enabled": types.StringType,
-						"port":    types.StringType,
-						"path":    types.StringType,
-					},
-				},
-				"entrypoint_overrides": types.ObjectType{
-					AttrTypes: map[string]attr.Type{
-						"enabled":    types.BoolType,
-						"entrypoint": types.ListType{ElemType: types.StringType},
-						"cmd":        types.ListType{ElemType: types.StringType},
-					},
-				},
-				"env": types.ListType{
-					ElemType: types.ObjectType{
-						AttrTypes: map[string]attr.Type{
-							"type":                         types.StringType,
-							"name":                         types.StringType,
-							"value_or_reference_to_secret": types.StringType,
-						},
-					},
-				},
-				"volume_mounts": types.ListType{
-					ElemType: types.ObjectType{
-						AttrTypes: map[string]attr.Type{
-							"type":        types.StringType,
-							"mount_path":  types.StringType,
-							"secret_name": types.StringType,
-							"size_in_mb":  types.Int64Type,
-							"volume_id":   types.StringType,
-						},
-					},
-				},
-			},
-		},
-		mergedContainers,
-	)
-	diagnostics.Append(diags...)
-	data.Containers = containersList
-}
-
-func (r *ContainerResource) flattenContainersToModel(ctx context.Context, containers []verda.DeploymentContainer, data *ContainerResourceModel, diagnostics *diag.Diagnostics) {
+func (r *ServerlessJobResource) flattenJobContainersToModel(ctx context.Context, containers []verda.DeploymentContainer, data *ServerlessJobResourceModel, diagnostics *diag.Diagnostics) {
 	if len(containers) == 0 {
 		return
 	}
@@ -874,7 +579,6 @@ func (r *ContainerResource) flattenContainersToModel(ctx context.Context, contai
 
 	for _, container := range containers {
 		// Build healthcheck object if present and enabled
-		// Only include healthcheck in state if it's actually enabled
 		var healthcheckObj types.Object
 		if container.Healthcheck != nil && container.Healthcheck.Enabled {
 			healthcheckAttrTypes := map[string]attr.Type{
@@ -987,8 +691,6 @@ func (r *ContainerResource) flattenContainersToModel(ctx context.Context, contai
 		}
 
 		// Build volume mounts list
-		// Note: We don't filter API-added mounts here because the merge function
-		// preserves volume_mounts from plan/state, which already has the correct data
 		var volumeMountsList types.List
 		if len(container.VolumeMounts) > 0 {
 			var volumeMountElements []attr.Value
@@ -1157,74 +859,168 @@ func (r *ContainerResource) flattenContainersToModel(ctx context.Context, contai
 	data.Containers = containersList
 }
 
-func (r *ContainerResource) flattenScalingToModel(ctx context.Context, scalingConfig *verda.ContainerScalingOptions, data *ContainerResourceModel, diagnostics *diag.Diagnostics) {
-	scaleDownPolicyObj, diags := types.ObjectValue(
-		map[string]attr.Type{
-			"delay_seconds": types.Int64Type,
-		},
-		map[string]attr.Value{
-			"delay_seconds": types.Int64Value(int64(scalingConfig.ScaleDownPolicy.DelaySeconds)),
-		},
-	)
-	diagnostics.Append(diags...)
-
-	scaleUpPolicyObj, diags := types.ObjectValue(
-		map[string]attr.Type{
-			"delay_seconds": types.Int64Type,
-		},
-		map[string]attr.Value{
-			"delay_seconds": types.Int64Value(int64(scalingConfig.ScaleUpPolicy.DelaySeconds)),
-		},
-	)
-	diagnostics.Append(diags...)
-
-	queueLoadObj, diags := types.ObjectValue(
-		map[string]attr.Type{
-			"threshold": types.Float64Type,
-		},
-		map[string]attr.Value{
-			"threshold": types.Float64Value(scalingConfig.ScalingTriggers.QueueLoad.Threshold),
-		},
-	)
-	diagnostics.Append(diags...)
-
+func (r *ServerlessJobResource) flattenJobScalingToModel(ctx context.Context, scalingConfig *verda.ContainerScalingOptions, data *ServerlessJobResourceModel, diagnostics *diag.Diagnostics) {
 	scalingObj, diags := types.ObjectValue(
 		map[string]attr.Type{
-			"min_replica_count":               types.Int64Type,
-			"max_replica_count":               types.Int64Type,
-			"queue_message_ttl_seconds":       types.Int64Type,
-			"deadline_seconds":                types.Int64Type,
-			"concurrent_requests_per_replica": types.Int64Type,
-			"scale_down_policy": types.ObjectType{
-				AttrTypes: map[string]attr.Type{
-					"delay_seconds": types.Int64Type,
-				},
-			},
-			"scale_up_policy": types.ObjectType{
-				AttrTypes: map[string]attr.Type{
-					"delay_seconds": types.Int64Type,
-				},
-			},
-			"queue_load": types.ObjectType{
-				AttrTypes: map[string]attr.Type{
-					"threshold": types.Float64Type,
-				},
-			},
+			"max_replica_count":         types.Int64Type,
+			"queue_message_ttl_seconds": types.Int64Type,
+			"deadline_seconds":          types.Int64Type,
 		},
 		map[string]attr.Value{
-			"min_replica_count":               types.Int64Value(int64(scalingConfig.MinReplicaCount)),
-			"max_replica_count":               types.Int64Value(int64(scalingConfig.MaxReplicaCount)),
-			"queue_message_ttl_seconds":       types.Int64Value(int64(scalingConfig.QueueMessageTTLSeconds)),
-			"deadline_seconds":                types.Int64Value(int64(scalingConfig.QueueMessageTTLSeconds)),
-			"concurrent_requests_per_replica": types.Int64Value(int64(scalingConfig.ConcurrentRequestsPerReplica)),
-			"scale_down_policy":               scaleDownPolicyObj,
-			"scale_up_policy":                 scaleUpPolicyObj,
-			"queue_load":                      queueLoadObj,
+			"max_replica_count":         types.Int64Value(int64(scalingConfig.MaxReplicaCount)),
+			"queue_message_ttl_seconds": types.Int64Value(int64(scalingConfig.QueueMessageTTLSeconds)),
+			"deadline_seconds":          types.Int64Value(int64(scalingConfig.DeadlineSeconds)),
 		},
 	)
 	diagnostics.Append(diags...)
 	data.Scaling = scalingObj
 }
 
-// boolDefaultModifier is defined in resource_instance.go but we need it here too
-// volumeMountValidator is now defined in validators.go and shared across resources
+func (r *ServerlessJobResource) mergeJobContainersFromPlan(ctx context.Context, planContainers types.List, data *ServerlessJobResourceModel, diagnostics *diag.Diagnostics) {
+	if planContainers.IsNull() || planContainers.IsUnknown() {
+		return
+	}
+
+	var planContainersList []ContainerModel
+	diags := planContainers.ElementsAs(ctx, &planContainersList, false)
+	diagnostics.Append(diags...)
+	if diagnostics.HasError() {
+		return
+	}
+
+	var apiContainersList []ContainerModel
+	if !data.Containers.IsNull() && !data.Containers.IsUnknown() {
+		diags = data.Containers.ElementsAs(ctx, &apiContainersList, false)
+		diagnostics.Append(diags...)
+		if diagnostics.HasError() {
+			return
+		}
+	}
+
+	// If API didn't return containers or returned fewer containers, use plan as-is
+	if len(apiContainersList) == 0 || len(apiContainersList) != len(planContainersList) {
+		data.Containers = planContainers
+		return
+	}
+
+	// Merge each container: use API data where available, fill in from plan where not
+	var mergedContainers []attr.Value
+	for i := range planContainersList {
+		if i >= len(apiContainersList) {
+			break
+		}
+
+		planContainer := planContainersList[i]
+		apiContainer := apiContainersList[i]
+
+		// Use plan volume_mounts since API doesn't return all fields
+		mergedContainer := apiContainer
+		mergedContainer.VolumeMounts = planContainer.VolumeMounts
+
+		// Preserve entrypoint_overrides from plan if API didn't return it
+		if (apiContainer.EntrypointOverrides.IsNull() || apiContainer.EntrypointOverrides.IsUnknown()) &&
+			!planContainer.EntrypointOverrides.IsNull() {
+			mergedContainer.EntrypointOverrides = planContainer.EntrypointOverrides
+		}
+
+		// Convert back to attr.Value
+		containerAttrTypes := map[string]attr.Type{
+			"image":        types.StringType,
+			"exposed_port": types.Int64Type,
+			"healthcheck": types.ObjectType{
+				AttrTypes: map[string]attr.Type{
+					"enabled": types.StringType,
+					"port":    types.StringType,
+					"path":    types.StringType,
+				},
+			},
+			"entrypoint_overrides": types.ObjectType{
+				AttrTypes: map[string]attr.Type{
+					"enabled":    types.BoolType,
+					"entrypoint": types.ListType{ElemType: types.StringType},
+					"cmd":        types.ListType{ElemType: types.StringType},
+				},
+			},
+			"env": types.ListType{
+				ElemType: types.ObjectType{
+					AttrTypes: map[string]attr.Type{
+						"type":                         types.StringType,
+						"name":                         types.StringType,
+						"value_or_reference_to_secret": types.StringType,
+					},
+				},
+			},
+			"volume_mounts": types.ListType{
+				ElemType: types.ObjectType{
+					AttrTypes: map[string]attr.Type{
+						"type":        types.StringType,
+						"mount_path":  types.StringType,
+						"secret_name": types.StringType,
+						"size_in_mb":  types.Int64Type,
+						"volume_id":   types.StringType,
+					},
+				},
+			},
+		}
+
+		containerAttrValues := map[string]attr.Value{
+			"image":                mergedContainer.Image,
+			"exposed_port":         mergedContainer.ExposedPort,
+			"healthcheck":          mergedContainer.Healthcheck,
+			"entrypoint_overrides": mergedContainer.EntrypointOverrides,
+			"env":                  mergedContainer.Env,
+			"volume_mounts":        mergedContainer.VolumeMounts,
+		}
+
+		containerObj, diags := types.ObjectValue(containerAttrTypes, containerAttrValues)
+		diagnostics.Append(diags...)
+		mergedContainers = append(mergedContainers, containerObj)
+	}
+
+	// Create the merged containers list
+	containersList, diags := types.ListValue(
+		types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"image":        types.StringType,
+				"exposed_port": types.Int64Type,
+				"healthcheck": types.ObjectType{
+					AttrTypes: map[string]attr.Type{
+						"enabled": types.StringType,
+						"port":    types.StringType,
+						"path":    types.StringType,
+					},
+				},
+				"entrypoint_overrides": types.ObjectType{
+					AttrTypes: map[string]attr.Type{
+						"enabled":    types.BoolType,
+						"entrypoint": types.ListType{ElemType: types.StringType},
+						"cmd":        types.ListType{ElemType: types.StringType},
+					},
+				},
+				"env": types.ListType{
+					ElemType: types.ObjectType{
+						AttrTypes: map[string]attr.Type{
+							"type":                         types.StringType,
+							"name":                         types.StringType,
+							"value_or_reference_to_secret": types.StringType,
+						},
+					},
+				},
+				"volume_mounts": types.ListType{
+					ElemType: types.ObjectType{
+						AttrTypes: map[string]attr.Type{
+							"type":        types.StringType,
+							"mount_path":  types.StringType,
+							"secret_name": types.StringType,
+							"size_in_mb":  types.Int64Type,
+							"volume_id":   types.StringType,
+						},
+					},
+				},
+			},
+		},
+		mergedContainers,
+	)
+	diagnostics.Append(diags...)
+	data.Containers = containersList
+}

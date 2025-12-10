@@ -139,6 +139,7 @@ func (p *VerdaProvider) Resources(ctx context.Context) []func() resource.Resourc
 		NewVolumeResource,
 		NewContainerResource,
 		NewContainerRegistryCredentialsResource,
+		NewServerlessJobResource,
 	}
 }
 
