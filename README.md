@@ -5,8 +5,26 @@ Terraform/OpenTofu provider for managing Verda Cloud infrastructure.
 ## Requirements
 
 - [Terraform](https://www.terraform.io/downloads.html) >= 1.0
-- [Go](https://golang.org/doc/install) >= 1.23 (for building the provider)
-- Verda Cloud account with OAuth2 credentials (Client ID and Client Secret)
+- [Go](https://golang.org/doc/install) >= 1.23 (for development)
+- Verda Cloud account with API credentials (Client ID and Client Secret)
+
+## Beta version
+
+This software is currently in beta and will contain bugs. Please try it out and report your issues in the repository.
+
+As the provider is not yet in the Terraform registry, the local version needs to be referred in your .terraformrc file:
+
+```terraform
+provider_installation {
+  dev_overrides {
+    "verda-cloud/verda" = "/path/to/binary/terraform-provider-verda"
+  }
+
+  direct {}
+}
+```
+
+The binary can be downloaded to your machine from the Releases page. Usage instructions and examples can be found from the [examples](examples) directory.
 
 ## Using the Provider
 
@@ -145,10 +163,6 @@ Then build the provider and use it in your Terraform configurations.
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-See the LICENSE file for details.
 
 ## Support
 
