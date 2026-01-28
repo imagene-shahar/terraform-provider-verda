@@ -1,5 +1,3 @@
-# This is a GoReleaser configuration for Terraform Provider releases.
-# See: https://goreleaser.com/customization/
 version: 2
 
 before:
@@ -7,13 +5,13 @@ before:
     - go mod tidy
 
 builds:
-  - env:
-      - CGO_ENABLED=0
-    mod_timestamp: "{{ .CommitTimestamp }}"
-    flags:
-      - -trimpath
+  - id: terraform-provider-verda
+    binary: terraform-provider-verda
+    main: .
     ldflags:
-      - "-s -w -X main.version={{.Version}}"
+      - -s -w -X main.version={{ .Version }}
+    env:
+      - CGO_ENABLED=0
     goos:
       - linux
       - darwin
@@ -22,25 +20,32 @@ builds:
       - amd64
       - arm64
     ignore:
+      # Windows arm64 not supported by Terraform
       - goos: windows
         goarch: arm64
-    binary: "{{ .ProjectName }}_v{{ .Version }}"
 
 archives:
-  - format: zip
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+  - formats:
+      - zip
+    name_template: >-
+      terraform-provider-verda_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    files:
+      - none*
 
 checksum:
-  name_template: "{{ .ProjectName }}_{{ .Version }}_SHA256SUMS"
-  algorithm: sha256
+  name_template: terraform-provider-verda_{{ .Version }}_SHA256SUMS
   extra_files:
-    - glob: "terraform-registry-manifest.json"
-      name_template: "{{ .ProjectName }}_{{ .Version }}_manifest.json"
+    - glob: terraform-provider-verda_{{ .Version }}_manifest.json
 
 signs:
   - artifacts: checksum
+    cmd: gpg
     args:
       - "--batch"
+      - "--pinentry-mode"
+      - "loopback"
+      - "--passphrase"
+      - "{{ .Env.GPG_PASSPHRASE }}"
       - "--local-user"
       - "{{ .Env.GPG_FINGERPRINT }}"
       - "--output"
@@ -50,15 +55,4 @@ signs:
 
 release:
   extra_files:
-    - glob: "terraform-registry-manifest.json"
-      name_template: "{{ .ProjectName }}_{{ .Version }}_manifest.json"
-
-changelog:
-  sort: asc
-  filters:
-    exclude:
-      - "^docs:"
-      - "^test:"
-      - "^chore:"
-      - "Merge pull request"
-      - "Merge branch"
+    - glob: terraform-provider-verda_{{ .Version }}_manifest.json
