@@ -133,6 +133,7 @@ func (p *VerdaProvider) Configure(ctx context.Context, req provider.ConfigureReq
 
 func (p *VerdaProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
+		NewClusterResource,
 		NewInstanceResource,
 		NewSSHKeyResource,
 		NewStartupScriptResource,
@@ -140,6 +141,8 @@ func (p *VerdaProvider) Resources(ctx context.Context) []func() resource.Resourc
 		NewContainerResource,
 		NewContainerRegistryCredentialsResource,
 		NewServerlessJobResource,
+		NewSecretResource,
+		NewFileSecretResource,
 	}
 }
 

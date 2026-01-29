@@ -104,6 +104,7 @@ The Verda provider includes the following resources:
 
 ### Compute
 
+- [verda_cluster](resources/cluster.md) - GPU clusters
 - [verda_instance](resources/instance.md) - GPU compute instances
 - [verda_ssh_key](resources/ssh_key.md) - SSH keys for instance access
 - [verda_startup_script](resources/startup_script.md) - Startup scripts for instance initialization
@@ -117,3 +118,8 @@ The Verda provider includes the following resources:
 - [verda_container](resources/container.md) - Serverless container deployments with auto-scaling
 - [verda_serverless_job](resources/serverless_job.md) - Batch job deployments
 - [verda_container_registry_credentials](resources/container_registry_credentials.md) - Private registry authentication
+
+### Secrets
+
+- [verda_secret](resources/secret.md) - Secrets for deployments
+- [verda_file_secret](resources/file_secret.md) - Fileset secrets for mounts
