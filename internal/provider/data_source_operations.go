@@ -104,6 +104,103 @@ func (d *ContainerDeploymentStatusDataSource) Read(ctx context.Context, req data
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
+// Container deployment environment variables data source
+
+type ContainerDeploymentEnvironmentVariablesDataSource struct {
+	client *verda.Client
+}
+
+type ContainerDeploymentEnvironmentVariablesDataSourceModel struct {
+	DeploymentName types.String `tfsdk:"deployment_name"`
+	Env            types.List   `tfsdk:"env"`
+}
+
+func NewContainerDeploymentEnvironmentVariablesDataSource() datasource.DataSource {
+	return &ContainerDeploymentEnvironmentVariablesDataSource{}
+}
+
+func (d *ContainerDeploymentEnvironmentVariablesDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_container_environment_variables"
+}
+
+func (d *ContainerDeploymentEnvironmentVariablesDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		MarkdownDescription: "Fetches environment variables for a container deployment.",
+		Attributes: map[string]schema.Attribute{
+			"deployment_name": schema.StringAttribute{
+				Required:            true,
+				MarkdownDescription: "Deployment name.",
+			},
+			"env": schema.ListNestedAttribute{
+				Computed:            true,
+				MarkdownDescription: "Environment variables.",
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"type": schema.StringAttribute{Computed: true},
+						"name": schema.StringAttribute{Computed: true},
+						"value_or_reference_to_secret": schema.StringAttribute{
+							Computed: true,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func (d *ContainerDeploymentEnvironmentVariablesDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	if req.ProviderData == nil {
+		return
+	}
+
+	client, ok := req.ProviderData.(*verda.Client)
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Unexpected Data Source Configure Type",
+			fmt.Sprintf("Expected *verda.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+		)
+		return
+	}
+
+	d.client = client
+}
+
+func (d *ContainerDeploymentEnvironmentVariablesDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	var data ContainerDeploymentEnvironmentVariablesDataSourceModel
+
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	envVars, err := d.client.ContainerDeployments.GetEnvironmentVariables(ctx, data.DeploymentName.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read container environment variables, got error: %s", err))
+		return
+	}
+
+	attrTypes := map[string]attr.Type{
+		"type":                         types.StringType,
+		"name":                         types.StringType,
+		"value_or_reference_to_secret": types.StringType,
+	}
+
+	var items []map[string]attr.Value
+	for _, envVar := range envVars {
+		items = append(items, map[string]attr.Value{
+			"type":                         types.StringValue(envVar.Type),
+			"name":                         types.StringValue(envVar.Name),
+			"value_or_reference_to_secret": types.StringValue(envVar.ValueOrReferenceToSecret),
+		})
+	}
+
+	listValue, diags := objectListValue(attrTypes, items)
+	resp.Diagnostics.Append(diags...)
+	data.Env = listValue
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
 // Container deployment replicas data source
 
 type ContainerDeploymentReplicasDataSource struct {
