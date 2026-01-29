@@ -17,11 +17,11 @@ Create a simple GPU instance with SSH access:
 
 ```terraform
 resource "verda_instance" "example" {
-  instance_type = "small"
-  image         = "ubuntu-22.04"
+  instance_type = "1B200.30V"
+  image         = "ubuntu-24.04-cuda-12.8-open-docker"
   hostname      = "my-instance"
-  description   = "Example compute instance"
-  location      = "FIN-01"
+  description   = "Example GPU instance"
+  location      = "FIN-03"
 
   ssh_key_ids = [verda_ssh_key.example.id]
 }
@@ -42,11 +42,11 @@ resource "verda_startup_script" "docker_setup" {
 }
 
 resource "verda_instance" "production" {
-  instance_type = "medium"
-  image         = "ubuntu-22.04"
+  instance_type = "1B200.30V"
+  image         = "ubuntu-24.04-cuda-12.8-open-docker"
   hostname      = "production-server"
   description   = "Production ML training server"
-  location      = "FIN-01"
+  location      = "FIN-03"
 
   ssh_key_ids       = [verda_ssh_key.example.id]
   startup_script_id = verda_startup_script.docker_setup.id
@@ -78,11 +78,11 @@ Use spot instances for cost-effective batch processing:
 
 ```terraform
 resource "verda_instance" "spot" {
-  instance_type = "large"
-  image         = "ubuntu-22.04"
+  instance_type = "1B200.30V"
+  image         = "ubuntu-24.04-cuda-12.8-open-docker"
   hostname      = "batch-processor"
   description   = "Cost-effective batch processing"
-  location      = "FIN-01"
+  location      = "FIN-03"
   is_spot       = true
 
   ssh_key_ids = [verda_ssh_key.example.id]
@@ -91,14 +91,31 @@ resource "verda_instance" "spot" {
 
 ~> **Note:** Spot instances offer significant cost savings but may be terminated when capacity is needed. Use them for fault-tolerant workloads.
 
+## Finding Available Instance Types and Images
+
+To discover available instance types, images, and locations for your Verda account, use the Verda API:
+
+```bash
+# List available instance types
+curl -H "Authorization: Bearer $TOKEN" https://api.verda.com/v1/instance-types
+
+# List available images
+curl -H "Authorization: Bearer $TOKEN" https://api.verda.com/v1/images
+
+# List available locations
+curl -H "Authorization: Bearer $TOKEN" https://api.verda.com/v1/locations
+```
+
+For full API documentation, visit: [Verda API Reference](https://api.verda.com/v1/docs#tag/instance-types)
+
 ## Schema
 
 ### Required
 
 - `description` (String) Description of the instance.
 - `hostname` (String) Hostname for the instance.
-- `image` (String) Image to use for the instance (e.g., `ubuntu-22.04`).
-- `instance_type` (String) Type of the instance (e.g., `small`, `medium`, `large`).
+- `image` (String) Image to use for the instance. Use the API to list available images.
+- `instance_type` (String) Type of the instance (e.g., `1B200.30V`). Use the API to list available instance types.
 
 ### Optional
 

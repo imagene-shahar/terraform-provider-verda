@@ -33,11 +33,11 @@ resource "verda_volume" "training_data" {
 }
 
 resource "verda_instance" "ml_server" {
-  instance_type    = "medium"
-  image            = "ubuntu-22.04"
+  instance_type    = "1B200.30V"
+  image            = "ubuntu-24.04-cuda-12.8-open-docker"
   hostname         = "ml-server"
   description      = "Machine learning server"
-  location         = "FIN-01"
+  location         = "FIN-03"
   existing_volumes = [verda_volume.training_data.id]
 
   ssh_key_ids = [verda_ssh_key.main.id]
@@ -62,11 +62,11 @@ resource "verda_volume" "checkpoints" {
 }
 
 resource "verda_instance" "trainer" {
-  instance_type    = "large"
-  image            = "ubuntu-22.04"
+  instance_type    = "1B200.30V"
+  image            = "ubuntu-24.04-cuda-12.8-open-docker"
   hostname         = "trainer"
   description      = "Model training instance"
-  location         = "FIN-01"
+  location         = "FIN-03"
   existing_volumes = [
     verda_volume.datasets.id,
     verda_volume.checkpoints.id

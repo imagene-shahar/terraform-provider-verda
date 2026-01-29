@@ -1,0 +1,27 @@
+# Gitleaks configuration
+# https://github.com/gitleaks/gitleaks
+
+title = "Verda Terraform Provider Gitleaks Config"
+
+[extend]
+# Use the default gitleaks config as base
+useDefault = true
+
+[allowlist]
+# Paths to ignore (test/example files with placeholder credentials)
+paths = [
+    '''test/integration/testdata/container_registry_credentials/main\.tf''',
+    '''examples/.*\.tf''',
+    '''\.env\.example''',
+]
+
+# Regex patterns to allow (placeholder tokens)
+regexes = [
+    '''dckr_pat_test_token_for_integration''',
+    '''ghp_xxxxxxxxxxxxx''',
+    '''dckr_pat_xxxxxxxxxxxxx''',
+    '''your-client-id''',
+    '''your-client-secret''',
+    '''AKIAXXXXXXXXXXXXXXXX''',
+    '''xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx''',
+]

@@ -107,7 +107,7 @@ func (r *InstanceResource) Schema(ctx context.Context, req resource.SchemaReques
 				},
 			},
 			"instance_type": schema.StringAttribute{
-				MarkdownDescription: "Type of the instance (e.g., 'small', 'medium', 'large')",
+				MarkdownDescription: "Type of the instance (e.g., '1B200.30V')",
 				Required:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),

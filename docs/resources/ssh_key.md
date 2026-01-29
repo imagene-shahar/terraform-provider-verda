@@ -38,11 +38,11 @@ resource "verda_ssh_key" "team" {
 }
 
 resource "verda_instance" "server" {
-  instance_type = "small"
-  image         = "ubuntu-22.04"
+  instance_type = "1B200.30V"
+  image         = "ubuntu-24.04-cuda-12.8-open-docker"
   hostname      = "app-server"
   description   = "Application server"
-  location      = "FIN-01"
+  location      = "FIN-03"
 
   ssh_key_ids = [verda_ssh_key.team.id]
 }

@@ -85,11 +85,11 @@ resource "verda_startup_script" "init" {
 }
 
 resource "verda_instance" "server" {
-  instance_type     = "small"
-  image             = "ubuntu-22.04"
+  instance_type     = "1B200.30V"
+  image             = "ubuntu-24.04-cuda-12.8-open-docker"
   hostname          = "my-instance"
   description       = "Instance with startup script"
-  location          = "FIN-01"
+  location          = "FIN-03"
   startup_script_id = verda_startup_script.init.id
 
   ssh_key_ids = [verda_ssh_key.main.id]

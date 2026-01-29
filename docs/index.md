@@ -40,11 +40,11 @@ resource "verda_ssh_key" "main" {
 
 # Create a GPU compute instance
 resource "verda_instance" "gpu_workstation" {
-  instance_type = "gpu-medium"
-  image         = "ubuntu-22.04"
+  instance_type = "1B200.30V"
+  image         = "ubuntu-24.04-cuda-12.8-open-docker"
   hostname      = "ml-workstation"
   description   = "Machine learning development instance"
-  location      = "FIN-01"
+  location      = "FIN-03"
 
   ssh_key_ids = [verda_ssh_key.main.id]
 }
@@ -79,6 +79,16 @@ provider "verda" {}
 ```
 
 -> **Tip:** Environment variables are the recommended approach for production deployments and CI/CD pipelines.
+
+## API Reference
+
+To discover available instance types, images, and locations, use the Verda API:
+
+- **Instance Types**: `GET https://api.verda.com/v1/instance-types` - Lists all available GPU instance types with specifications
+- **Images**: `GET https://api.verda.com/v1/images` - Lists available OS images with CUDA versions
+- **Locations**: `GET https://api.verda.com/v1/locations` - Lists available data center locations
+
+For full API documentation, visit: [Verda API Reference](https://api.verda.com/v1/docs)
 
 ## Schema
 

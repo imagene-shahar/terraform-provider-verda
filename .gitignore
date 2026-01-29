@@ -35,6 +35,9 @@ go.work.sum
 *.swo
 *~
 
+# Temp backup files (created by gofumpt, editors, etc.)
+*.go.[0-9]*
+
 # Terraform files
 *.tfstate
 *.tfstate.*

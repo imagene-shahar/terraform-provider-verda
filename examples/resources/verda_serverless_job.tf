@@ -8,9 +8,9 @@ resource "verda_serverless_job" "example" {
   }
 
   scaling = {
-    max_replica_count               = 5
-    queue_message_ttl_seconds       = 7200
-    deadline_seconds                = 3600
+    max_replica_count         = 5
+    queue_message_ttl_seconds = 7200
+    deadline_seconds          = 3600
   }
 
   containers = [
@@ -38,9 +38,9 @@ resource "verda_serverless_job" "data_processing" {
   }
 
   scaling = {
-    max_replica_count               = 10
-    queue_message_ttl_seconds       = 14400
-    deadline_seconds                = 7200
+    max_replica_count         = 10
+    queue_message_ttl_seconds = 14400
+    deadline_seconds          = 7200
   }
 
   container_registry_settings = {
@@ -84,9 +84,9 @@ resource "verda_serverless_job" "ml_inference" {
   }
 
   scaling = {
-    max_replica_count               = 20
-    queue_message_ttl_seconds       = 3600
-    deadline_seconds                = 1800
+    max_replica_count         = 20
+    queue_message_ttl_seconds = 3600
+    deadline_seconds          = 1800
   }
 
   containers = [
@@ -150,9 +150,9 @@ resource "verda_serverless_job" "batch_processor" {
   }
 
   scaling = {
-    max_replica_count               = 8
-    queue_message_ttl_seconds       = 7200
-    deadline_seconds                = 3600
+    max_replica_count         = 8
+    queue_message_ttl_seconds = 7200
+    deadline_seconds          = 3600
   }
 
   containers = [

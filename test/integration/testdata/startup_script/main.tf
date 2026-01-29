@@ -1,6 +1,8 @@
-# Basic startup script
-resource "verda_startup_script" "example" {
-  name   = "install-docker"
+# Integration test: Startup Script resource
+# This test follows the documentation examples exactly
+
+resource "verda_startup_script" "test" {
+  name   = "integration-test-docker-setup"
   script = <<-EOF
     #!/bin/bash
     set -e
@@ -20,7 +22,11 @@ resource "verda_startup_script" "example" {
   EOF
 }
 
-# Output startup script information
+# Output startup script information for verification
 output "startup_script_id" {
-  value = verda_startup_script.example.id
+  value = verda_startup_script.test.id
+}
+
+output "startup_script_name" {
+  value = verda_startup_script.test.name
 }
