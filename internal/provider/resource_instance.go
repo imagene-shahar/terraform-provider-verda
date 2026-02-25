@@ -39,7 +39,7 @@ type InstanceResourceModel struct {
 	IP              types.String  `tfsdk:"ip"`
 	Status          types.String  `tfsdk:"status"`
 	CreatedAt       types.String  `tfsdk:"created_at"`
-	SSHKeyIDs       types.List    `tfsdk:"ssh_key_ids"`
+	SSHKeyIDs       types.Set     `tfsdk:"ssh_key_ids"`
 	Location        types.String  `tfsdk:"location"`
 	IsSpot          types.Bool    `tfsdk:"is_spot"`
 	OSName          types.String  `tfsdk:"os_name"`
@@ -149,14 +149,14 @@ func (r *InstanceResource) Schema(ctx context.Context, req resource.SchemaReques
 				Computed:            true,
 				MarkdownDescription: "Creation timestamp",
 			},
-			"ssh_key_ids": schema.ListAttribute{
+			"ssh_key_ids": schema.SetAttribute{
 				MarkdownDescription: "List of SSH key IDs to add to the instance",
 				ElementType:         types.StringType,
 				Optional:            true,
 				Computed:            true,
-				PlanModifiers: []planmodifier.List{
-					listplanmodifier.RequiresReplace(),
-					listplanmodifier.UseStateForUnknown(),
+				PlanModifiers: []planmodifier.Set{
+					setRequiresReplaceModifier{},
+					setUseStateForUnknownModifier{},
 				},
 			},
 			"location": schema.StringAttribute{
@@ -548,9 +548,9 @@ func (r *InstanceResource) flattenInstanceToModel(ctx context.Context, instance 
 		data.StartupScriptID = types.StringNull()
 	}
 
-	sshKeyList, diags := types.ListValueFrom(ctx, types.StringType, instance.SSHKeyIDs)
+	sshKeySet, diags := types.SetValueFrom(ctx, types.StringType, instance.SSHKeyIDs)
 	diagnostics.Append(diags...)
-	data.SSHKeyIDs = sshKeyList
+	data.SSHKeyIDs = sshKeySet
 
 	cpuObj, cpuDiags := types.ObjectValue(
 		map[string]attr.Type{
@@ -614,6 +614,56 @@ func (r *InstanceResource) flattenInstanceToModel(ctx context.Context, instance 
 	)
 	diagnostics.Append(storDiags...)
 	data.Storage = storageObj
+}
+
+// setRequiresReplaceModifier is a plan modifier for types.Set that requires
+// resource replacement when the set value changes.
+type setRequiresReplaceModifier struct{}
+
+func (m setRequiresReplaceModifier) Description(_ context.Context) string {
+	return "If the value of this attribute changes, Terraform will destroy and recreate the resource."
+}
+
+func (m setRequiresReplaceModifier) MarkdownDescription(_ context.Context) string {
+	return "If the value of this attribute changes, Terraform will destroy and recreate the resource."
+}
+
+func (m setRequiresReplaceModifier) PlanModifySet(_ context.Context, req planmodifier.SetRequest, resp *planmodifier.SetResponse) {
+	if req.State.Raw.IsNull() {
+		return
+	}
+	if req.PlanValue.IsUnknown() {
+		return
+	}
+	if req.StateValue.Equal(req.PlanValue) {
+		return
+	}
+	resp.RequiresReplace = true
+}
+
+// setUseStateForUnknownModifier is a plan modifier for types.Set that copies
+// a known prior state value into the planned value when the plan is unknown.
+type setUseStateForUnknownModifier struct{}
+
+func (m setUseStateForUnknownModifier) Description(_ context.Context) string {
+	return "Once set, the value of this attribute in state will not change."
+}
+
+func (m setUseStateForUnknownModifier) MarkdownDescription(_ context.Context) string {
+	return "Once set, the value of this attribute in state will not change."
+}
+
+func (m setUseStateForUnknownModifier) PlanModifySet(_ context.Context, req planmodifier.SetRequest, resp *planmodifier.SetResponse) {
+	if req.State.Raw.IsNull() {
+		return
+	}
+	if !req.PlanValue.IsUnknown() {
+		return
+	}
+	if req.ConfigValue.IsUnknown() {
+		return
+	}
+	resp.PlanValue = req.StateValue
 }
 
 // Custom plan modifier for bool default value
