@@ -5,7 +5,7 @@
 variable "instance_type" {
   description = "Instance type for testing"
   type        = string
-  default     = "1B200.30V" # Default from docs
+  default     = "CPU.8V.32G"
 }
 
 variable "instance_image" {
