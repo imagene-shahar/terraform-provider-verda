@@ -78,6 +78,8 @@ resource "verda_instance" "trainer" {
 
 -> **Tip:** Volumes must be in the same location as the instance they are attached to.
 
+-> **Remote attachment:** To attach a volume to an instance that is created separately — and to receive the mount command as an output — use the [`verda_volume_attachment`](volume_attachment) resource instead of `existing_volumes`.
+
 ## Schema
 
 ### Required

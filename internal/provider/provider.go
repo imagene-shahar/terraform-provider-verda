@@ -142,6 +142,7 @@ func (p *VerdaProvider) Resources(ctx context.Context) []func() resource.Resourc
 		NewSSHKeyResource,
 		NewStartupScriptResource,
 		NewVolumeResource,
+		NewVolumeAttachmentResource,
 		NewContainerResource,
 		NewContainerRegistryCredentialsResource,
 		NewServerlessJobResource,
