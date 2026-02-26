@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.1.2] - 2026-02-26
+
+### Added
+
+- feat(volumes): Add new resource for managing shared filesystem volumes (verda_volume_attachment)
+
+### Fixed
+
+- fix(instances): Support multiple SSH keys without crashing
+
 ## [v1.1.1] - 2026-02-05
 
 ### Added
